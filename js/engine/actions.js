@@ -1,0 +1,348 @@
+/* =========================================================
+   玩家操作 & 重置（传承）逻辑
+   ========================================================= */
+(function () {
+
+    /* ---------------- 建筑 ---------------- */
+    function buyBuilding(state, name, amount) {
+        const b = state.buildings[name];
+        const cfg = BUILDINGS_CONFIG[name];
+        if (!b || !b.unlocked) return { ok: false, msg: '尚未解锁。' };
+        amount = amount || 1;
+        let built = 0;
+        if (amount === 'max') {
+            let guard = 0;
+            while (guard++ < 2000) {
+                const price = ProductionEngine.buildingPrice(state, name);
+                if (!ResourcesManager.canAfford(price)) break;
+                ResourcesManager.spend(price);
+                b.count++; b.active++;
+                built++;
+            }
+        } else {
+            for (let i = 0; i < amount; i++) {
+                const price = ProductionEngine.buildingPrice(state, name);
+                if (!ResourcesManager.canAfford(price)) break;
+                ResourcesManager.spend(price);
+                b.count++; b.active++;
+                built++;
+            }
+        }
+        if (!built) return { ok: false, msg: '资源不足。' };
+        state.stats.totalBuildingBuilt += built;
+        if (b.count === built) EventEngine.addLog(state, '建造了「' + name + '」×' + built + '。');
+        ProductionEngine.updatePrices(state);
+        ProductionEngine.computeProductionAndCaps(state);
+        return { ok: true, built: built, msg: '建造「' + name + '」×' + built };
+    }
+
+    function setBuildingActive(state, name, active) {
+        const b = state.buildings[name];
+        if (!b) return;
+        if (active === 'toggle') active = b.active > 0 ? 0 : b.count;
+        if (active === 'all') active = b.count;
+        b.active = Utils.clamp(Math.round(active), 0, b.count);
+        if (b.active === 0) b.efficiency = 1;
+        ProductionEngine.updatePrices(state);
+        ProductionEngine.computeProductionAndCaps(state);
+    }
+
+    function setBuildingMode(state, name, mode) {
+        const b = state.buildings[name];
+        const cfg = BUILDINGS_CONFIG[name];
+        if (!b || !cfg || !cfg.modes) return;
+        b.mode = Utils.clamp(mode, 0, cfg.modes.length - 1);
+        ProductionEngine.computeProductionAndCaps(state);
+    }
+
+    /* ---------------- 科技 ---------------- */
+    function research(state, name) {
+        const t = state.techs[name];
+        const cfg = TECHS_CONFIG[name];
+        if (!t || !cfg || t.researched) return { ok: false };
+        if (!ProductionEngine.techAvailable(state, name)) return { ok: false, msg: '前置科技尚未完成。' };
+        if (!ResourcesManager.canAfford(cfg.cost)) return { ok: false, msg: '研究所需资源不足。' };
+        ResourcesManager.spend(cfg.cost);
+        t.researched = true;
+        EventEngine.addLog(state, '📖 完成研究「' + name + '」：' + cfg.desc);
+        ProductionEngine.updatePrices(state);
+        ProductionEngine.computeProductionAndCaps(state);
+        AchievementEngine.check(state);
+        return { ok: true, msg: '完成研究：' + name };
+    }
+
+    /* ---------------- 升级 ---------------- */
+    function buyUpgrade(state, name) {
+        const u = state.upgrades[name];
+        const cfg = UPGRADES_CONFIG[name];
+        if (!u || !cfg || !u.visible) return { ok: false };
+        if (u.level >= cfg.cap) return { ok: false, msg: '已达到等级上限。' };
+        const price = ProductionEngine.upgradePrice(state, name);
+        if (!ResourcesManager.canAfford(price)) return { ok: false, msg: '资源不足。' };
+        ResourcesManager.spend(price);
+        u.level++;
+        ProductionEngine.updatePrices(state);
+        ProductionEngine.computeProductionAndCaps(state);
+        return { ok: true, msg: name + ' → 等级 ' + u.level };
+    }
+
+    /* ---------------- 国策 ---------------- */
+    function setPolicy(state, name, value) {
+        const p = state.policies[name];
+        const cfg = POLICIES_CONFIG[name];
+        if (!p || !cfg || !p.visible) return { ok: false };
+        value = Utils.clamp(Math.round(value), cfg.min, cfg.max);
+        const delta = Math.abs(value - p.value);
+        const cost = Math.ceil(delta * cfg.cost * 0.5);
+        if (cost > 0) {
+            if (state.resources['政策点'].amount + 1e-9 < cost) {
+                return { ok: false, msg: '政策点不足（需要 ' + cost + ' 点）。' };
+            }
+            state.resources['政策点'].amount -= cost;
+        }
+        p.value = value;
+        ProductionEngine.computeProductionAndCaps(state);
+        return { ok: true, cost: cost };
+    }
+
+    /* ---------------- 传承（永久强化） ---------------- */
+    function permanentCost(state, name) {
+        const cfg = PERMANENT_CONFIG[name];
+        const lvl = state.permanent[name].level;
+        const res = cfg.tree === 'relic' ? '奥术遗物' : (cfg.tree === 'star' ? '星辉' : '原初之核');
+        return { res: res, amount: Math.ceil(cfg.cost * Math.pow(cfg.costG, lvl)) };
+    }
+
+    function buyPermanent(state, name) {
+        const cfg = PERMANENT_CONFIG[name];
+        const p = state.permanent[name];
+        if (!cfg || !p) return { ok: false };
+        if (p.level >= cfg.max) return { ok: false, msg: '已达最高等级。' };
+        if (cfg.req && state.permanent[cfg.req] && !state.permanent[cfg.req].level) {
+            return { ok: false, msg: '需要先解锁「' + cfg.req + '」。' };
+        }
+        const c = permanentCost(state, name);
+        if (state.resources[c.res].amount + 1e-9 < c.amount) return { ok: false, msg: c.res + '不足。' };
+        state.resources[c.res].amount -= c.amount;
+        p.level++;
+        p.researched = true;
+        EventEngine.addLog(state, '✦ 传承强化「' + name + '」提升至 ' + p.level + ' 级，消耗 ' + c.amount + ' ' + c.res + '。');
+        ProductionEngine.computeProductionAndCaps(state);
+        return { ok: true, msg: name + ' → ' + p.level + ' 级' };
+    }
+
+    /* ---------------- 试炼 ---------------- */
+    function toggleChallenge(state, id) {
+        const c = state.challenges[id];
+        if (!c) return { ok: false };
+        c.active = !c.active;
+        ProductionEngine.computeProductionAndCaps(state);
+        return { ok: true, msg: (c.active ? '开启' : '关闭') + '试炼「' + id + '」' };
+    }
+
+    function activeStars(state) {
+        let stars = 0;
+        for (const cfg of CHALLENGES_CONFIG) {
+            const st = state.challenges[cfg.id];
+            if (st && st.active) stars += cfg.star;
+        }
+        return stars;
+    }
+
+    /* ---------------- 重置收益 ---------------- */
+    function relicGain(state) {
+        const knowledgeCap = state.resources['魔法知识'].cap;
+        const popCap = state.localResources.population.capacity;
+        const towers = state.buildings['时之沙漏'].count + state.buildings['星辰塔'].count;
+        const base = Math.pow(Math.log(Math.max(1, knowledgeCap) + 1), 2) + popCap / 15;
+        const bMult = 1 + 0.03 * towers;
+        const eMult = (1 + EffectsManager.additive(state, 'relicGain')) * (1 + EffectsManager.additive(state, 'resetGain'));
+        const starMult = 1 + activeStars(state) * 0.05;
+        return Math.floor(base * bMult * eMult * starMult);
+    }
+
+    function starGain(state) {
+        const relics = ResourcesManager.amount('奥术遗物');
+        const eMult = (1 + EffectsManager.additive(state, 'resetGain'));
+        const starMult = 1 + activeStars(state) * 0.05;
+        return Math.max(1, Math.floor(Math.sqrt(Math.max(1, relics)) * 0.6 * eMult * starMult));
+    }
+
+    function coreGain(state) {
+        const stars = ResourcesManager.amount('星辉');
+        const eMult = (1 + EffectsManager.additive(state, 'resetGain'));
+        const starMult = 1 + activeStars(state) * 0.05;
+        return Math.max(1, Math.floor(Math.sqrt(Math.max(1, stars)) / 4 * eMult * starMult));
+    }
+
+    function resetAvailability(state) {
+        return {
+            relic: state.resources['魔法知识'].cap >= 200,
+            star: ResourcesManager.amount('奥术遗物') >= 300,
+            core: ResourcesManager.amount('星辉') >= 60,
+        };
+    }
+
+    /* 重置：清空非传承进度，按 opts 补发传承资源 */
+    function performReset(state, opts) {
+        opts = opts || {};
+        const keepArtifacts = EffectsManager.hasSpecial(state, 'keepArtifacts');
+        const oldArtifacts = { inventory: state.artifacts.inventory, equipped: state.artifacts.equipped };
+
+        /* 重置前记录试炼完成情况 */
+        const stars = activeStars(state);
+        if (stars > state.stats.maxChallengeStars) state.stats.maxChallengeStars = stars;
+        for (const cfg of CHALLENGES_CONFIG) {
+            const st = state.challenges[cfg.id];
+            if (!st || !st.active || st.completed) continue;
+            const need = cfg.requireReset;
+            if (need === 'any' || need === opts.type) {
+                st.completed = true;
+                EventEngine.addLog(state, '⚔️ 完成试炼「' + cfg.id + '」，永久获得：' + cfg.rewardText);
+                if (window.UI && UI.toast) UI.toast('⚔️ 试炼完成：' + cfg.id, 'gold');
+            }
+        }
+
+        const keepRelic = ResourcesManager.amount('奥术遗物');
+        const keepStar = ResourcesManager.amount('星辉');
+        const keepCore = ResourcesManager.amount('原初之核');
+        const achievements = state.achievements;
+        const stats = state.stats;
+        const settings = state.settings;
+        const permanent = state.permanent;
+        const challenges = state.challenges;
+        const expeditionHistory = state.expedition.history;
+
+        /* 重新初始化，再恢复保留项 */
+        initState();
+        state.achievements = achievements;
+        state.stats = stats;
+        state.settings = settings;
+        state.permanent = permanent;
+        state.challenges = challenges;
+        state.expedition.history = expeditionHistory;
+        state.resources['奥术遗物'].amount = keepRelic + (opts.relic || 0);
+        state.resources['星辉'].amount = keepStar + (opts.star || 0);
+        state.resources['原初之核'].amount = keepCore + (opts.core || 0);
+        state.stats.resets[opts.type] = (state.stats.resets[opts.type] || 0) + 1;
+        state.stats.history.unshift({ day: state.stats.playSeconds, type: opts.type });
+        if (state.stats.history.length > 50) state.stats.history.pop();
+
+        /* 文明火种：重置后的启动资源 */
+        grantStartResources(state);
+
+        /* 文明薪火：自动研究第一时代科技 */
+        const autoTech = state.permanent['文明薪火'] ? state.permanent['文明薪火'].level : 0;
+        if (autoTech > 0) {
+            const era1 = TECHS_ORDER.filter(n => TECHS_CONFIG[n].era === 1);
+            const count = autoTech >= 3 ? era1.length : (autoTech === 2 ? 4 : 1);
+            for (let i = 0; i < Math.min(count, era1.length); i++) {
+                state.techs[era1[i]].researched = true;
+            }
+        }
+
+        /* 秘宝 */
+        if (keepArtifacts) {
+            state.artifacts.inventory = (oldArtifacts.inventory || []).filter(a => true);
+            state.artifacts.equipped = (oldArtifacts.equipped || []).filter(Boolean);
+        }
+        /* 脆弱秘宝在重置中碎裂 */
+        state.artifacts.inventory = state.artifacts.inventory.filter(a => {
+            if (a.fragile) { EventEngine.addLog(state, '💔 脆弱秘宝「' + a.name + '」在时间崩塌中碎裂了。'); return false; }
+            return true;
+        });
+        state.artifacts.equipped = state.artifacts.equipped.map(a => {
+            if (a && a.fragile) { EventEngine.addLog(state, '💔 脆弱秘宝「' + a.name + '」在时间崩塌中碎裂了。'); return null; }
+            return a;
+        });
+
+        ProductionEngine.updatePrices(state);
+        ProductionEngine.computeProductionAndCaps(state);
+        EventEngine.addLog(state, '🕯️ ' + (opts.label || '重置') + '完成，文明在废墟上重新开始。');
+        return true;
+    }
+
+    /* 重置后的启动资源（含「文明火种」传承加成） */
+    function grantStartResources(state) {
+        state.resources['木材'].amount += 25;
+        state.resources['石料'].amount += 15;
+        const e = EffectsManager.refreshAllEffects(state);
+        if (e.startResources > 0) {
+            ResourcesManager.add({ 木材: 300, 石料: 200, 食物: 100, 魔力: 80 });
+        }
+    }
+
+    function prestige(state, type) {
+        const avail = resetAvailability(state);
+        if (type === 'relic') {
+            if (!avail.relic) return { ok: false, msg: '需要魔法知识上限达到 200。' };
+            const gain = relicGain(state);
+            performReset(state, { type: 'relic', relic: gain, label: '时空回响' });
+            return { ok: true, msg: '时空回响！获得 ' + Utils.fmtInt(gain) + ' 奥术遗物。' };
+        }
+        if (type === 'star') {
+            if (!avail.star) return { ok: false, msg: '需要持有 300 枚奥术遗物。' };
+            const relics = relicGain(state) * 2;
+            const stars = starGain(state);
+            performReset(state, { type: 'star', relic: relics, star: stars, label: '星辰升华' });
+            return { ok: true, msg: '星辰升华！获得 ' + Utils.fmtInt(relics) + ' 奥术遗物与 ' + Utils.fmtInt(stars) + ' 星辉。' };
+        }
+        if (type === 'core') {
+            if (!avail.core) return { ok: false, msg: '需要持有 60 枚星辉。' };
+            const relics = relicGain(state) * 5;
+            const stars = Math.floor(starGain(state) * 1.5);
+            const cores = coreGain(state);
+            performReset(state, { type: 'core', relic: relics, star: stars, core: cores, label: '原初归寂' });
+            return { ok: true, msg: '原初归寂！获得 ' + Utils.fmtInt(cores) + ' 原初之核、' + Utils.fmtInt(stars) + ' 星辉与 ' + Utils.fmtInt(relics) + ' 奥术遗物。' };
+        }
+        return { ok: false };
+    }
+
+    /* ---------------- 自动化 ---------------- */
+    function autoBuildStep(state) {
+        if (!state.settings.autoBuild) return null;
+        if (!EffectsManager.hasSpecial(state, 'autoBuild')) return null;
+        if (!EffectsManager.hasSpecial(state, 'perfectEfficiency') && state.localResources.population.used >= state.localResources.population.capacity) return null;
+        let best = null, bestPrice = null;
+        for (const name in state.buildings) {
+            const b = state.buildings[name];
+            if (!b.unlocked || b.visible === false) continue;
+            const price = ProductionEngine.buildingPrice(state, name);
+            if (!ResourcesManager.canAfford(price)) continue;
+            let total = 0;
+            for (const k in price) total += price[k] / Math.max(1e-9, state.resources[k].cap);
+            if (!best || total < bestPrice) { best = name; bestPrice = total; }
+        }
+        if (!best) return null;
+        return buyBuilding(state, best, 1);
+    }
+
+    function autoExpeditionStep(state) {
+        if (!state.settings.autoExpedition) return null;
+        if (!EffectsManager.hasSpecial(state, 'autoExpedition')) return null;
+        if (state.expedition.active) return null;
+        const last = state.expedition.history[0];
+        const order = last ? last.region : null;
+        const regions = EXPEDITIONS_CONFIG.slice().reverse();
+        for (const r of regions) {
+            if (!order || r.name !== order) continue;
+            const check = ExpeditionEngine.canStart(state, r);
+            if (check.ok) return startExpedition(state, r.name);
+            return null;
+        }
+        return null;
+    }
+
+    function startExpedition(state, name) {
+        const res = ExpeditionEngine.start(state, name);
+        if (res.ok) ProductionEngine.computeProductionAndCaps(state);
+        return res;
+    }
+
+    window.Actions = {
+        buyBuilding, setBuildingActive, setBuildingMode,
+        research, buyUpgrade, setPolicy, buyPermanent, permanentCost,
+        toggleChallenge, activeStars, relicGain, starGain, coreGain, resetAvailability,
+        prestige, performReset, autoBuildStep, autoExpeditionStep, startExpedition,
+    };
+})();

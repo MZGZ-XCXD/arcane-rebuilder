@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>魔法重建者 · Arcane Rebuilder</title>
+<meta name="description" content="中世纪魔法题材的放置建造游戏：从一座倒塌的法师塔开始，重建被大崩坏摧毁的魔法文明。">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="dark-theme">
+
+<div id="app">
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-rune">✦</span>
+      <h1>魔法重建者</h1>
+      <span class="brand-sub">Arcane Rebuilder</span>
+    </div>
+    <div class="topbar-stats">
+      <div class="top-stat"><span class="top-label">时代</span><span id="stat-era">灰烬时代</span></div>
+      <div class="top-stat"><span class="top-label">纪元</span><span id="stat-date">第 1 年 1 日</span></div>
+      <div class="top-stat"><span class="top-label">流逝</span><span id="stat-speed">×1.00</span></div>
+      <div class="top-stat" id="stat-happy"><span class="top-label">民望</span><span class="ok">100%</span></div>
+    </div>
+    <div class="topbar-actions">
+      <button class="icon-btn" id="btn-pause" data-act="pause" title="暂停 / 继续">⏸</button>
+      <button class="icon-btn" id="btn-theme" data-act="theme" title="切换明暗主题">🌙</button>
+      <button class="icon-btn" id="btn-settings" data-act="modal|settings" title="设置与存档">⚙</button>
+    </div>
+  </header>
+
+  <div class="main-layout">
+    <aside class="sidebar">
+      <section class="panel" id="panel-population"></section>
+      <section class="panel" id="panel-resources"></section>
+      <section class="panel" id="panel-actions"></section>
+    </aside>
+
+    <main class="main-content">
+      <nav class="tabs" id="tabs"></nav>
+      <div class="tab-content" id="tab-content"></div>
+    </main>
+
+    <aside class="log-panel">
+      <section class="panel" id="panel-event"></section>
+      <section class="panel" id="panel-expedition"></section>
+      <section class="panel" id="panel-log"></section>
+      <section class="panel" id="panel-stats"></section>
+    </aside>
+  </div>
+</div>
+
+<div id="tooltip" class="tooltip" role="tooltip"></div>
+<div id="modal-root" class="modal-root"></div>
+<div id="toast-root" class="toast-root"></div>
+
+<!-- ===== 配置数据（纯数据，无副作用） ===== -->
+<script src="js/config/resources.js"></script>
+<script src="js/config/eras.js"></script>
+<script src="js/config/buildings.js"></script>
+<script src="js/config/techs.js"></script>
+<script src="js/config/upgrades.js"></script>
+<script src="js/config/policies.js"></script>
+<script src="js/config/permanent.js"></script>
+<script src="js/config/achievements.js"></script>
+<script src="js/config/challenges.js"></script>
+<script src="js/config/events.js"></script>
+<script src="js/config/expeditions.js"></script>
+
+<!-- ===== 引擎（与界面解耦） ===== -->
+<script src="js/engine/utils.js"></script>
+<script src="js/engine/state.js"></script>
+<script src="js/engine/effects.js"></script>
+<script src="js/engine/production.js"></script>
+<script src="js/engine/market.js"></script>
+<script src="js/engine/artifacts.js"></script>
+<script src="js/engine/expedition.js"></script>
+<script src="js/engine/eventengine.js"></script>
+<script src="js/engine/achievements.js"></script>
+<script src="js/engine/actions.js"></script>
+<script src="js/engine/save.js"></script>
+<script src="js/engine/loop.js"></script>
+
+<!-- ===== 界面 ===== -->
+<script src="js/ui/dom.js"></script>
+<script src="js/ui/panels.js"></script>
+<script src="js/ui/tab-buildings.js"></script>
+<script src="js/ui/tab-research.js"></script>
+<script src="js/ui/tab-ascend.js"></script>
+<script src="js/ui/tab-world.js"></script>
+<script src="js/ui/app.js"></script>
+
+<script src="js/main.js"></script>
+</body>
+</html>
