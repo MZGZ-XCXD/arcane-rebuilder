@@ -1,0 +1,17 @@
+# 操作系统 / 编辑器产生的杂项
+Thumbs.db
+Desktop.ini
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# 本地开发临时文件（自检页、临时分析脚本等）
+dev*.html
+work/
+/scratch/
+*.local.*
+
+# 依赖与构建缓存（本项目零依赖，仅备用）
+node_modules/
+.cache/
