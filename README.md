@@ -12,10 +12,28 @@
 
 ## 快速开始
 
-* **方式一（推荐）**：双击 `index.html`（或拖动到浏览器）。全部脚本都是普通 `<script>`，`file://` 下可直接运行。
-* **方式二**：使用上级目录的 `魔法重建者-单文件版.html`，整个游戏打包在一个文件里，方便分享。
+* **在线试玩**：<https://mzgz-xcxd.github.io/arcane-rebuilder/>
+  （由本仓库 `main` 分支根目录经 GitHub Pages 直接托管，纯静态页面、不需要任何构建步骤；更新 `main` 后会自动重新发布。）
+* **本地运行**：双击 `index.html`，或把整个目录拖进浏览器。全部脚本都是普通 `<script>`，`file://` 下可直接运行，不需要本地服务器。
+* **单文件版**（方便分享或离线保存）：执行 `node tools/build-single-file.js`，脚本会把样式与全部脚本内联，生成 `dist/arcane-rebuilder.html` 这一个独立文件。
 
-存档保存在浏览器 `localStorage`，关闭页面后再次打开会结算离线收益。
+存档保存在浏览器 `localStorage`，关闭页面后再次打开会结算离线收益；也可以在「设置」里导出 / 导入存档文本。
+
+## 界面截图
+
+建筑页的卡片只保留名称与操作，细节（产出、消耗、上限、人口、效率、造价、说明）都在鼠标悬浮浮窗里：
+
+![建筑页](screenshots/buildings.jpg)
+
+科技页按时代折叠，研究完的科技自动收进「已完成」折叠块，点标题随时展开：
+
+![科技页](screenshots/tech-folding.jpg)
+
+传承重置与浅色主题：
+
+![传承](screenshots/ascension.jpg)
+
+![浅色主题](screenshots/light-theme.jpg)
 
 ## 主要系统
 
@@ -49,30 +67,43 @@
 ## 文件结构
 
 ```
-魔法重建者/
-├── index.html            入口（多文件版）
-├── css/style.css         深色「秘法」+ 浅色「羊皮卷」双主题
+arcane-rebuilder/
+├── index.html                  入口（双击即玩）
+├── README.md
+├── CHANGELOG.md                更新日志（每次改动都写在这里）
+├── .gitattributes              行尾统一为 LF，二进制文件不做转换
+├── .gitignore
+├── css/
+│   └── style.css               深色「秘法」+ 浅色「羊皮卷」双主题
 ├── js/
-│   ├── config/           纯数据配置：资源、建筑、科技、升级、国策、传承、成就、试炼、事件、远征
-│   ├── engine/           游戏引擎（与界面完全解耦，可脱离浏览器运行）
-│   │   ├── utils.js      数值格式化 / 随机 / 时间
-│   │   ├── state.js      全局状态与资源管理
-│   │   ├── effects.js    加成聚合（科技/升级/国策/传承/成就/试炼/秘宝/事件/建筑全局）
-│   │   ├── production.js 生产核心：效率迭代、上限、民望、可见性、价格
-│   │   ├── market.js     贸易与价格热度
-│   │   ├── artifacts.js  秘宝生成与装备
-│   │   ├── expedition.js 远征判定与结算
-│   │   ├── eventengine.js 随机事件与限时效果
-│   │   ├── achievements.js 成就检测
-│   │   ├── actions.js    玩家操作与三层重置
-│   │   ├── save.js       存档、导入导出、离线收益
-│   │   └── loop.js       主循环
-│   └── ui/               界面层（原生 DOM，无框架）
-│       ├── dom.js        DOM 工具、悬浮提示、弹窗、浮层提示
-│       ├── panels.js     顶栏 / 人口 / 资源 / 操作 / 事件 / 日志 / 统计 / 各类弹窗
-│       ├── tab-buildings.js / tab-research.js / tab-ascend.js / tab-world.js  各标签页
-│       └── app.js        标签页调度、事件委托、快捷键
-└── js/main.js            启动入口
+│   ├── main.js                 启动入口
+│   ├── config/                 纯数据配置：资源、建筑、科技、升级、国策、传承、成就、试炼、事件、远征
+│   ├── engine/                 游戏引擎（与界面完全解耦，可脱离浏览器运行）
+│   │   ├── utils.js            数值格式化 / 随机 / 时间
+│   │   ├── state.js            全局状态与资源管理
+│   │   ├── effects.js          加成聚合（科技/升级/国策/传承/成就/试炼/秘宝/事件/建筑全局）
+│   │   ├── production.js       生产核心：效率迭代、上限、民望、可见性、价格
+│   │   ├── market.js           贸易与价格热度
+│   │   ├── artifacts.js        秘宝生成与装备
+│   │   ├── expedition.js       远征判定与结算
+│   │   ├── eventengine.js      随机事件与限时效果
+│   │   ├── achievements.js     成就检测
+│   │   ├── actions.js          玩家操作与三层重置
+│   │   ├── save.js             存档、导入导出、离线收益
+│   │   └── loop.js             主循环
+│   └── ui/                     界面层（原生 DOM，无框架）
+│       ├── dom.js              DOM 工具、悬浮提示、DOM 补丁刷新、弹窗
+│       ├── panels.js           顶栏 / 人口 / 资源 / 操作 / 事件 / 日志 / 统计 / 各类弹窗
+│       ├── tab-buildings.js    建筑页
+│       ├── tab-research.js     科技页（按时代折叠）与升级页
+│       ├── tab-ascend.js       国策页与传承（重置）页
+│       ├── tab-world.js        远征 / 贸易 / 成就页
+│       └── app.js              标签页调度、事件委托、快捷键
+├── tools/
+│   └── build-single-file.js    单文件版打包脚本
+├── dist/
+│   └── arcane-rebuilder.html   打包产物（单文件版，可直接双击运行）
+└── screenshots/                README 使用的界面截图
 ```
 
 ## 数值设计要点
@@ -102,12 +133,30 @@
   效率不足时名称旁会出现 `受限 NN%` 标记，用于提示该建筑当前没有满效率运转。
 * 浏览器控制台无报错即可运行；常用调试入口：`GameState`、`Actions`、`ProductionEngine`、`UI.render()`。
 
-### 重新打包单文件版
+### 单文件版打包
 
-单文件版由 `index.html` 内联 `css/style.css` 与全部 `js/**/*.js` 生成，
-可按需在构建脚本中调整输出路径后重新生成。
+```bash
+node tools/build-single-file.js
+```
+
+脚本读取 `index.html`，把 `css/style.css` 与全部 `js/**/*.js` 内联进一个 HTML，
+输出到 `dist/arcane-rebuilder.html`。只需要 Node，无需任何依赖；改了源码后重新执行一次即可。
 
 ## 兼容性
 
 桌面与移动端浏览器（Chrome / Edge / Firefox / Safari 近两年版本）。
 窄屏下三栏会自动堆叠，数字键 1-8 切换标签页，空格暂停。
+
+## 更新日志
+
+所有变更都记录在 [CHANGELOG.md](CHANGELOG.md)。约定很简单：
+
+* 平时改完就把内容写进文件最上方的「未发布」段落（按 新增 / 变更 / 修复 分类）；
+* 发版时把它改成 `[版本号] - 日期`，再补一个新的空「未发布」；
+* 版本号按语义化版本：主版本 = 存档或玩法结构大改，次版本 = 新增系统内容，修订号 = 平衡与修复；
+* 影响老存档的改动要同步提升 `js/engine/state.js` 里的 `SAVE_VERSION` 并在日志里注明。
+
+## 许可
+
+本仓库目前未附带开源许可证，默认保留所有权利（All rights reserved）。
+如果希望他人可以自由使用、修改与分发，建议添加 MIT 或 Apache-2.0 许可证文件，并把本段替换为对应说明。
